@@ -1,0 +1,14 @@
+# Runtime state of the local Airflow stack (database, logs, config, task output)
+data/*
+!data/.gitkeep
+
+# Local overrides
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Playwright MCP scratch output
+.playwright-mcp/
