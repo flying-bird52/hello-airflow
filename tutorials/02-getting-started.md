@@ -9,7 +9,16 @@ docker compose up -d
 ```
 
 The first time, Docker downloads the images (~1.5 GB) — grab a coffee ☕.
-Then `airflow-init` prepares the database and exits, and the other services start.
+Then `airflow-init` prepares the database and exits, and the other services start:
+
+```mermaid
+flowchart LR
+    pg[(postgres)] -->|healthy| init[airflow-init<br/>migrate DB + create user]
+    init -->|exits OK| api[airflow-apiserver<br/>:8080]
+    init -->|exits OK| sch[airflow-scheduler]
+    init -->|exits OK| dp[airflow-dag-processor]
+    init -->|exits OK| tr[airflow-triggerer]
+```
 
 Check that everything is up:
 

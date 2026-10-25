@@ -46,6 +46,22 @@ hand a Python list to `transform()`. Instead:
    (key `return_value`).
 2. When `transform` starts, Airflow pulls that XCom and passes it as the `orders` argument.
 
+```mermaid
+sequenceDiagram
+    participant E as extract (process 1)
+    participant DB as Metadata DB (XCom table)
+    participant T as transform (process 2)
+    participant L as load (process 3)
+    E->>DB: push return_value = [20 orders]
+    Note over E: extract finishes ✅
+    T->>DB: pull extract.return_value
+    DB-->>T: [20 orders] → orders argument
+    T->>DB: push return_value = {"tea": 37.56, ...}
+    L->>DB: pull transform.return_value
+    DB-->>L: totals argument
+    L->>DB: push return_value = "/opt/airflow/data/sales/sales_2026-10-25.csv"
+```
+
 You can see XComs in the UI: open a task instance → **Storage → XCom**.
 
 ![XCom values of the transform task](images/09-etl-xcom.png)

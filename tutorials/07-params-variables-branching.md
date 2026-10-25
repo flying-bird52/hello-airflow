@@ -52,6 +52,20 @@ Variables can also come from **environment variables** named `AIRFLOW_VAR_<KEY>`
 AIRFLOW_VAR_GREETING_NAME: 'new Airflow user'
 ```
 
+Where values come from, in a nutshell:
+
+```mermaid
+flowchart LR
+    form["Trigger form / CLI -c / API conf"] -->|per run| params["params[...]"]
+    defaults["Param defaults in the DAG"] -->|scheduled runs| params
+    env["AIRFLOW_VAR_* env vars"] -->|checked first| var["Variable.get(...)"]
+    ui["Admin → Variables (DB)"] -->|then| var
+    conn["Admin → Connections"] -->|conn_id| hooks["Hooks & operators"]
+    params --> task((your task))
+    var --> task
+    hooks --> task
+```
+
 Environment-defined variables are **not shown in the UI** (that's why the screenshot only lists
 `sales_report_recipients`) but `Variable.get` finds them, and they win over UI values.
 
@@ -70,6 +84,13 @@ def choose_path(params=None) -> str:
     return "greet_in_french" if params["language"] == "fr" else "greet_in_english"
 
 choose_path() >> [greet_in_english(), greet_in_french()]
+```
+
+```mermaid
+flowchart LR
+    choose{"choose_path<br/>params.language?"}
+    choose -->|"'fr' → returns 'greet_in_french'"| fr[greet_in_french ✅]
+    choose -.->|"not chosen"| en[greet_in_english ⏭️ skipped]
 ```
 
 A `@task.branch` task **returns the `task_id`(s) to follow**. Every other direct downstream task is

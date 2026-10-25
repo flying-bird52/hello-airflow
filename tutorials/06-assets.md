@@ -5,6 +5,18 @@ guessing ("A runs at 02:00 and usually takes 20 min, so let's run B at 03:00…"
 
 **Assets** fix this: B runs *when A has actually updated the data*.
 
+```mermaid
+flowchart LR
+    subgraph time ["⏰ Time-based: guessing"]
+        direction LR
+        A1["DAG A<br/>02:00"] -.->|"hope it's done by 03:00"| B1["DAG B<br/>03:00"]
+    end
+    subgraph data ["📦 Asset-based: reacting"]
+        direction LR
+        A2[DAG A] -->|updates| AS[(asset)] -->|triggers| B2[DAG B]
+    end
+```
+
 ## The code
 
 [`dags/t03_assets.py`](../dags/t03_assets.py) defines two DAGs in one file:
@@ -30,6 +42,19 @@ def asset_consumer():
 
 - `outlets=[asset]` on a task: when the task **succeeds**, Airflow records an *asset event*.
 - `schedule=[asset]` on a DAG: a new run is created for each new asset event.
+```mermaid
+sequenceDiagram
+    actor You
+    participant P as t03_asset_producer
+    participant S as Scheduler
+    participant C as t03_asset_consumer
+    You->>P: ▷ Trigger
+    P->>P: fetch_weather writes weather.json
+    P->>S: task succeeded → asset event "weather"
+    S->>C: create run (asset_triggered__...)
+    C->>C: report reads weather.json
+```
+
 - An asset is just a **name + URI**. Airflow doesn't read or check the file — *you* decide what the
   asset represents (a file, a table, an S3 prefix…).
 

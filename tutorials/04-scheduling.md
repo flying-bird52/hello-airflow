@@ -29,21 +29,61 @@ Tip: [crontab.guru](https://crontab.guru) explains any cron expression in plain 
 - **`start_date`** – the DAG doesn't exist for dates before this. Always use a fixed date,
   **never `datetime.now()`** (it changes every time the file is parsed!).
 - **`catchup`** – if `True`, when you unpause a DAG whose `start_date` is in the past, Airflow creates
-  one run **for every missed interval**. With `start_date` = 1 Jan and `@daily`, that's hundreds of
-  runs at once. With `catchup=False` (the default in Airflow 3) only the most recent interval runs.
+  one run **for every missed schedule tick**. With `start_date` = 1 Jan and `@daily`, that's hundreds of
+  runs at once. With `catchup=False` (the default in Airflow 3) only the most recent tick runs.
+
+```mermaid
+flowchart LR
+    subgraph T ["catchup=True, unpaused on Oct 25 at 18:00"]
+        direction LR
+        t1[Jan 1] --> t2[Jan 2] --> t3[Jan 3] --> tdots[... ~300 runs ...] --> t4[Oct 25]
+    end
+    subgraph F ["catchup=False, unpaused on Oct 25 at 18:00"]
+        f1[Oct 25 only]
+    end
+```
 
 Try it: unpause `t02_taskflow_etl` with its toggle. A run named `scheduled__<today>T00:00:00+00:00`
-appears straight away — the latest interval — and **not** one per day since January.
+appears straight away (the most recent midnight) and **not** one per day since January.
 
-## Logical date & data interval
+## Logical date
 
-Every run carries dates you can use in your tasks:
+Every run carries dates you can use in your tasks. Here is the run we got by unpausing
+`t02_taskflow_etl` on 2026-10-25 (straight from the REST API):
 
-| Name                                      | For a `@daily` run created for 2026-10-25   |
-| ----------------------------------------- | ------------------------------------------- |
-| `logical_date`                            | `2026-10-25T00:00:00+00:00`                 |
-| `ds`                                      | `"2026-10-25"` (handy string version)       |
-| `data_interval_start` / `data_interval_end` | the time window this run is responsible for |
+| Name                                        | Value                                 |
+| ------------------------------------------- | ------------------------------------- |
+| `run_id`                                    | `scheduled__2026-10-25T00:00:00+00:00` |
+| `logical_date`                              | `2026-10-25T00:00:00+00:00`           |
+| `ds`                                        | `"2026-10-25"` (handy string version) |
+| `data_interval_start` / `data_interval_end` | both `2026-10-25T00:00:00+00:00`      |
+
+In Airflow 3, a cron schedule like `@daily` is a list of **trigger times**: the run for Oct 25 is
+created at Oct 25 00:00, and its `logical_date` is that same moment.
+
+```mermaid
+gantt
+    dateFormat YYYY-MM-DD HH:mm
+    axisFormat %b %d
+    section @daily runs
+    run logical_date Oct 23 :milestone, 2026-10-23 00:00, 0d
+    run logical_date Oct 24 :milestone, 2026-10-24 00:00, 0d
+    run logical_date Oct 25 :milestone, 2026-10-25 00:00, 0d
+    section Data your task processes
+    Oct 23 run reads Oct 22 :2026-10-22 00:00, 1d
+    Oct 24 run reads Oct 23 :2026-10-23 00:00, 1d
+    Oct 25 run reads Oct 24 :2026-10-24 00:00, 1d
+```
+
+So if a daily job processes "yesterday's" data, compute it from the logical date,
+e.g. `logical_date.subtract(days=1)` or `{{ macros.ds_add(ds, -1) }}` in templates.
+
+> 🕰️ **Coming from Airflow 2?** There, `@daily` meant a 24 h *data interval*: the run for
+> Oct 24 started on Oct 25 at midnight, and `data_interval_start/end` covered Oct 24.
+> Airflow 3 dropped that by default (`[scheduler] create_cron_data_intervals = False`). You can
+> get the old behaviour back per DAG with `schedule=CronDataIntervalTimetable("@daily", timezone="UTC")`
+> (`from airflow.timetables.interval import CronDataIntervalTimetable`).
+> Many older blog posts and Stack Overflow answers assume the Airflow 2 behaviour.
 
 Use these instead of "now" in your tasks. That way, **re-running last Tuesday's run processes last
 Tuesday's data** — that's what makes a pipeline idempotent. Our `load` task names its output file

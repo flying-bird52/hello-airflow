@@ -35,6 +35,21 @@ Three things make a DAG:
 3. **Dependencies** – `a >> b` means "b runs after a succeeds". You can also write
    `a >> [b, c]` (fan-out) or `[b, c] >> d` (fan-in).
 
+```mermaid
+flowchart LR
+    subgraph seq ["a >> b >> c"]
+        direction LR
+        a1[a] --> b1[b] --> c1[c]
+    end
+    subgraph fan ["a >> [b, c] >> d"]
+        direction LR
+        a2[a] --> b2[b] & c2[c]
+        b2 & c2 --> d2[d]
+    end
+```
+
+In a fan-out, `b` and `c` run **at the same time**; `d` waits for both.
+
 ## Look at it in the UI
 
 Go to **Dags → t01_hello_airflow** and switch to the **Graph** view (second icon top-left):
@@ -67,6 +82,22 @@ Switch to the **Grid** view (first icon top-left):
   🟩 success · 🟥 failed · 🟧 up for retry · 🩷 skipped · ⬜ no status yet.
 - On the right, the details of the selected run: dates, duration, who triggered it, and its task
   instances.
+
+The life of a task instance, simplified:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> scheduled: upstream tasks done
+    scheduled --> queued: sent to the executor
+    queued --> running: a slot is free
+    running --> success
+    running --> up_for_retry: error, retries left
+    up_for_retry --> scheduled: after retry_delay
+    running --> failed: error, no retries left
+    [*] --> skipped: branch not taken
+    [*] --> upstream_failed: an upstream task failed
+```
 
 ## Read the logs
 

@@ -29,6 +29,26 @@ def retries_and_failures():
 A task that raises an exception is marked **up_for_retry** (🟧) and re-run after `retry_delay`, until
 it succeeds or runs out of `retries`. Then it's **failed** (🟥).
 
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> try1: run
+    try1 --> success: ok
+    try1 --> wait1: ConnectionError
+    wait1 --> try2: after 10 s
+    try2 --> success: ok
+    try2 --> wait2: error
+    wait2 --> try3: after 10 s
+    try3 --> success: ok
+    try3 --> wait3: error
+    wait3 --> try4: after 10 s
+    try4 --> success: ok
+    try4 --> failed: error (retries=3 used up)
+    state "up_for_retry" as wait1
+    state "up_for_retry" as wait2
+    state "up_for_retry" as wait3
+```
+
 Trigger the DAG a few times. Sometimes `flaky_api_call` succeeds first time; sometimes you'll see it
 go orange and retry. The task instance shows a **Try Number**, and the Logs tab has one log per try.
 
@@ -50,6 +70,13 @@ error (`ValueError: I fail on purpose…`).
 Look at the breadcrumb: the **DAG run** has a green ✓ even though a task failed. A DAG run's final
 state is decided by its **leaf tasks** (the last ones). Our only leaf is `cleanup`, which has
 `trigger_rule="all_done"` and succeeded — so the run counts as a success.
+
+```mermaid
+flowchart LR
+    flaky[flaky_api_call ✅] --> cleanup
+    fails[always_fails ❌] --> cleanup["cleanup ✅<br/>trigger_rule=all_done<br/><b>leaf task</b>"]
+    cleanup ==> run(["DAG run state = ✅ success<br/>(decided by leaf tasks)"])
+```
 
 Remember this when you add "cleanup" or "notify" tasks at the end of a DAG: they can hide failures.
 Common fixes: put cleanup in parallel instead of at the end, or use Airflow's setup/teardown
