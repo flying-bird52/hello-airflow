@@ -10,7 +10,7 @@ Clone it, run one command, and learn Airflow by clicking through real DAGs.
 Requirements: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2) with **at least 4 GB of RAM** allocated.
 
 ```bash
-git clone https://github.com/flying-bird52/hello-airflow.git
+git clone <url-of-this-repo> hello-airflow
 cd hello-airflow
 docker compose up -d
 ```
